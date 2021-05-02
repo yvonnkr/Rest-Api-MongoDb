@@ -41,10 +41,47 @@ public class TodoController {
         }
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getSingleTodo(@PathVariable(value = "id") String id){
+        TodoDTO todo = todoService.getSingleTodo(id);
+        return todo != null ?
+                ResponseEntity.ok(todo) :
+                ResponseEntity.status(HttpStatus.NOT_FOUND).body( getResponseMessage("todo with id " + id + " not found"));
+
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateTodoById(@PathVariable(value = "id") String id, @RequestBody TodoDTO todo){
+        try {
+            TodoDTO updatedTodo = todoService.updateTodo(id, todo);
+            return ResponseEntity.ok(updatedTodo);
+        }catch (Exception e){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(getErrorMessage(e));
+        }
+
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteTodoById(@PathVariable(value = "id") String id){
+        try {
+            todoService.deleteTodoById(id);
+            return ResponseEntity.ok(getResponseMessage("todo deleted successfully"));
+        }catch (Exception e){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(getErrorMessage(e));
+        }
+
+    }
+
     private HashMap<String, String> getErrorMessage(Exception e) {
         HashMap<String, String> errorMessage = new HashMap<>();
         errorMessage.put("message", e.getMessage());
         return errorMessage;
+    }
+
+    private HashMap<String, String> getResponseMessage(String msg) {
+        HashMap<String, String> message = new HashMap<>();
+        message.put("message", msg);
+        return message;
     }
 
 }

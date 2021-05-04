@@ -1,15 +1,18 @@
 package com.yvolabs.rest.api.mongodb.service;
 
+import com.yvolabs.rest.api.mongodb.exception.TodoCollectionException;
 import com.yvolabs.rest.api.mongodb.model.TodoDTO;
 import com.yvolabs.rest.api.mongodb.repository.TodoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 @Service
-public class TodoService {
+public class TodoService implements ITodoService {
     private final TodoRepository todoRepository;
 
     @Autowired
@@ -17,47 +20,66 @@ public class TodoService {
         this.todoRepository = todoRepository;
     }
 
+    @Override
     public List<TodoDTO> getAllTodos() {
-        return todoRepository.findAll();
+        List<TodoDTO> todos = todoRepository.findAll();
+        return todos.size() > 0 ? todos : new ArrayList<>();
     }
 
-    public TodoDTO createTodo(TodoDTO todo) throws Exception {
-        //throw new Exception("something went wrong, please try again.");
-        todo.setCreatedAt(new Date(System.currentTimeMillis()));
-        TodoDTO newTodo = todoRepository.insert(todo);
-        return todoRepository.save(newTodo);
-    }
+    @Override
+    public TodoDTO getSingleTodo(String id) throws TodoCollectionException {
+        Optional<TodoDTO> todoOptional = todoRepository.findById(id);
 
-    public TodoDTO getSingleTodo(String id) {
-        return todoRepository.findById(id)
-                .orElse(null);
-    }
-
-    public TodoDTO updateTodo(String id, TodoDTO todo) throws Exception {
-        TodoDTO foundTodo = todoRepository.findById(id)
-                .orElse(null);
-
-        if (foundTodo == null) {
-            throw new Exception("todo with id " + id + " not found");
+        if (todoOptional.isEmpty()) {
+            throw new TodoCollectionException(TodoCollectionException.NotFoundException(id));
         }
 
-        foundTodo.setTodo(todo.getTodo() != null ? todo.getTodo() : foundTodo.getTodo());
-        foundTodo.setDescription(todo.getDescription() != null ? todo.getDescription() : foundTodo.getDescription());
-        foundTodo.setCompleted(todo.getCompleted() != null? todo.getCompleted() : foundTodo.getCompleted());
-        foundTodo.setUpdatedAt(new Date(System.currentTimeMillis()));
-        return todoRepository.save(foundTodo);
-
+        return todoOptional.get();
     }
 
-    public void deleteTodoById(String id) throws Exception {
-        TodoDTO foundTodo = todoRepository.findById(id)
-                .orElse(null);
+    @Override
+    public void createTodo(TodoDTO todo) throws TodoCollectionException {
+        Optional<TodoDTO> todoOptional = todoRepository.findByTodo(todo.getTodo());
 
-        if (foundTodo == null) {
-            throw new Exception("todo with id " + id + " not found");
+        if (todoOptional.isPresent()) {
+            throw new TodoCollectionException(TodoCollectionException.TodoAlreadyExists());
+        }
+
+        todo.setCreatedAt(new Date(System.currentTimeMillis()));
+        todoRepository.save(todo);
+    }
+
+
+    @Override
+    public void updateTodo(String id, TodoDTO todo) throws TodoCollectionException {
+        Optional<TodoDTO> todoWithId = todoRepository.findById(id);
+        Optional<TodoDTO> todoWithSameName = todoRepository.findByTodo(todo.getTodo());
+
+        if (todoWithId.isPresent()) {
+            if (todoWithSameName.isPresent() && !todoWithSameName.get().getId().equals(id)) {
+                throw new TodoCollectionException(TodoCollectionException.TodoAlreadyExists());
+            }
+
+            TodoDTO todoToUpdate = todoWithId.get();
+
+            todoToUpdate.setTodo(todo.getTodo());
+            todoToUpdate.setDescription(todo.getDescription());
+            todoToUpdate.setCompleted(todo.getCompleted());
+            todoToUpdate.setUpdatedAt(new Date(System.currentTimeMillis()));
+            todoRepository.save(todoToUpdate);
+        } else {
+            throw new TodoCollectionException(TodoCollectionException.NotFoundException(id));
+        }
+    }
+
+    @Override
+    public void deleteTodoById(String id) throws TodoCollectionException {
+        Optional<TodoDTO> todoOptional = todoRepository.findById(id);
+
+        if (todoOptional.isEmpty()) {
+            throw new TodoCollectionException(TodoCollectionException.NotFoundException(id));
         }
 
         todoRepository.deleteById(id);
-
     }
 }
